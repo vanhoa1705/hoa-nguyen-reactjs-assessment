@@ -18,7 +18,3 @@ export function classifySwipe(info: SwipeInfo): SwipeDirection {
   if (!isSwipe) return 'none'
   return info.offset.x > 0 ? 'like' : 'dislike'
 }
-
-export function isClick(offsetX: number): boolean {
-  return Math.abs(offsetX) <= CLICK_MAX_OFFSET
-}

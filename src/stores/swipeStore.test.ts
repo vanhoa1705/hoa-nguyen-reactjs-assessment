@@ -46,11 +46,3 @@ describe('advance', () => {
   })
 })
 
-describe('reset', () => {
-  it('resets to initial state', () => {
-    useSwipeStore.setState({ currentBreedId: '5', isDone: true })
-    useSwipeStore.getState().reset()
-    expect(useSwipeStore.getState().currentBreedId).toBeNull()
-    expect(useSwipeStore.getState().isDone).toBe(false)
-  })
-})

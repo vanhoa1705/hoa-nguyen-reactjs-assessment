@@ -40,11 +40,11 @@ vi.mock('framer-motion', () => ({
 
 vi.mock('../../api/dogApi', () => ({
   fetchBreedsPage: vi.fn(),
-  fetchBreedImage: vi.fn(),
   postVote: vi.fn(),
+  fetchVotes: vi.fn(),
 }))
 
-import { fetchBreedsPage, fetchBreedImage, postVote } from '../../api/dogApi'
+import { fetchBreedsPage, postVote, fetchVotes } from '../../api/dogApi'
 
 const breeds: Breed[] = [
   {
@@ -68,12 +68,7 @@ const breeds: Breed[] = [
 beforeEach(() => {
   useSwipeStore.setState({ currentBreedId: null, isDone: false })
   vi.mocked(fetchBreedsPage).mockResolvedValue(breeds)
-  vi.mocked(fetchBreedImage).mockResolvedValue({
-    id: 'img-1',
-    url: 'https://example.com/dog.jpg',
-    width: 800,
-    height: 600,
-  })
+  vi.mocked(fetchVotes).mockResolvedValue([])
   vi.mocked(postVote).mockResolvedValue({ id: 1, message: 'SUCCESS' })
 })
 
@@ -88,18 +83,15 @@ describe('MainPage', () => {
     await waitFor(() => expect(screen.getAllByText('Affenpinscher').length).toBeGreaterThan(0))
   })
 
-  it('shows progress counter', async () => {
-    renderWithProviders(<MainPage />)
-    await waitFor(() => expect(screen.getByTestId('hint-line')).toBeInTheDocument())
-    expect(screen.getByTestId('hint-line').textContent).toContain('1 / 2')
-  })
-
   it('calls postVote with value 1 when like button clicked', async () => {
     renderWithProviders(<MainPage />)
     await waitFor(() => screen.getByRole('button', { name: 'Like breed' }))
     await userEvent.click(screen.getByRole('button', { name: 'Like breed' }))
     await waitFor(() =>
-      expect(postVote).toHaveBeenCalledWith({ imageId: 'img-1', value: 1 }, expect.any(Object)),
+      expect(postVote).toHaveBeenCalledWith(
+        { imageId: 'img-1', value: 1, breedId: '1' },
+        expect.any(Object),
+      ),
     )
   })
 
@@ -108,7 +100,10 @@ describe('MainPage', () => {
     await waitFor(() => screen.getByRole('button', { name: 'Dislike breed' }))
     await userEvent.click(screen.getByRole('button', { name: 'Dislike breed' }))
     await waitFor(() =>
-      expect(postVote).toHaveBeenCalledWith({ imageId: 'img-1', value: -1 }, expect.any(Object)),
+      expect(postVote).toHaveBeenCalledWith(
+        { imageId: 'img-1', value: -1, breedId: '1' },
+        expect.any(Object),
+      ),
     )
   })
 
@@ -117,13 +112,5 @@ describe('MainPage', () => {
     renderWithProviders(<MainPage />)
     await waitFor(() => expect(screen.getByTestId('done-state')).toBeInTheDocument())
     expect(screen.getByText(/seen all breeds/i)).toBeInTheDocument()
-  })
-
-  it('resets store when Start over clicked', async () => {
-    useSwipeStore.setState({ isDone: true })
-    renderWithProviders(<MainPage />)
-    await waitFor(() => screen.getByText('Start over'))
-    await userEvent.click(screen.getByText('Start over'))
-    expect(useSwipeStore.getState().isDone).toBe(false)
   })
 })

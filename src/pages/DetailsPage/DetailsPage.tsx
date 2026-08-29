@@ -1,9 +1,10 @@
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Skeleton from '../../components/Skeleton'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { useBreeds } from '../../hooks/useBreeds'
+import { useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { useVotes } from '../../hooks/useVotes'
 import { useSwipeStore } from '../../stores/swipeStore'
-import { fetchBreedImage, postVote } from '../../api/dogApi'
+import { fetchBreed, fetchBreedImage, postVote } from '../../api/dogApi'
+import type { Breed } from '../../types/breed'
 import type { VoteValue } from '../../types/vote'
 
 function InfoRow({ label, value }: { label: string; value?: string }) {
@@ -21,31 +22,51 @@ export default function DetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const { data: breeds, isLoading } = useBreeds()
+  const queryClient = useQueryClient()
   const advance = useSwipeStore((s) => s.advance)
-  const recordVote = useSwipeStore((s) => s.recordVote)
-  const votes = useSwipeStore((s) => s.votes)
+  const { data: apiVotes = [] } = useVotes()
 
-  const breed = breeds?.find((b) => String(b.id) === id)
-
-  const { data: image } = useQuery({
-    queryKey: ['image', breed?.reference_image_id],
-    queryFn: () => fetchBreedImage(breed!.reference_image_id!),
-    enabled: !!breed?.reference_image_id,
-    staleTime: 5 * 60 * 1000,
+  const { data: breed, isLoading } = useQuery({
+    queryKey: ['breed', id],
+    queryFn: () => fetchBreed(id!),
+    enabled: !!id,
+    staleTime: Infinity,
+    initialData: () => {
+      const cached = queryClient.getQueryData<InfiniteData<Breed[]>>(['breeds'])
+      return cached?.pages.flat().find((b) => String(b.id) === id)
+    },
   })
 
+  const voteValue = breed?.reference_image_id
+    ? [...apiVotes].reverse().find((v) => v.image_id === breed.reference_image_id)?.value
+    : undefined
+
+  const imageUrl = breed?.image?.url
+
+  const { data: fetchedImage } = useQuery({
+    queryKey: ['image', breed?.reference_image_id],
+    queryFn: () => fetchBreedImage(breed!.reference_image_id!),
+    enabled: !!breed?.reference_image_id && !imageUrl,
+    staleTime: Infinity,
+  })
+
+  const image = { url: imageUrl ?? fetchedImage?.url }
+
   function goBack() {
-    // location.key === 'default' means no prior SPA history entry
     if (location.key === 'default') navigate('/', { replace: true })
     else navigate(-1)
   }
 
+  function getBreeds() {
+    const cached = queryClient.getQueryData<InfiniteData<Breed[]>>(['breeds'])
+    return cached?.pages.flat() ?? []
+  }
+
   const { mutate } = useMutation({
     mutationFn: postVote,
-    onSuccess: (_data, variables) => {
-      recordVote(variables.breedId, variables.value)
-      advance(breeds ?? [])
+    onSuccess: () => {
+      advance(getBreeds())
+      void queryClient.invalidateQueries({ queryKey: ['votes'] })
       goBack()
     },
   })
@@ -55,8 +76,7 @@ export default function DetailsPage() {
     if (breed.reference_image_id) {
       mutate({ imageId: breed.reference_image_id, value, breedId: String(breed.id) })
     } else {
-      recordVote(String(breed.id), value)
-      advance(breeds ?? [])
+      advance(getBreeds())
       goBack()
     }
   }
@@ -133,15 +153,15 @@ export default function DetailsPage() {
           >
             ‹ Back
           </button>
-          {/* Super like */}
-          <button
+          {/* Super like — hidden if already voted */}
+          {voteValue === undefined && <button
             aria-label="Super like"
             onClick={() => handleVote(2)}
             className="absolute right-3 top-3 grid h-[52px] w-[52px] place-items-center rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-super backdrop-blur-md transition-transform hover:-translate-y-0.5 hover:border-super"
             style={{ boxShadow: '0 12px 24px -14px rgba(20,22,26,.7)' }}
           >
             ★
-          </button>
+          </button>}
           {/* Name + vote tag */}
           <div className="absolute inset-x-5 bottom-[18px] flex items-end gap-3">
             <h1
@@ -151,7 +171,7 @@ export default function DetailsPage() {
               {breed.name}
             </h1>
             {(() => {
-              const v = votes[String(breed.id)]
+              const v = voteValue
               if (v === undefined) return null
               const map: Record<number, { icon: string; label: string; color: string }> = {
                 1: { icon: '♥', label: 'Liked', color: '#2E5BFF' },
@@ -215,8 +235,8 @@ export default function DetailsPage() {
           )}
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-2.5 px-5 pb-[22px] pt-4">
+        {/* Action buttons — hidden if already voted */}
+        {voteValue === undefined && <div className="flex gap-2.5 px-5 pb-[22px] pt-4">
           <button
             aria-label="Dislike"
             onClick={() => handleVote(-1)}
@@ -232,7 +252,7 @@ export default function DetailsPage() {
           >
             ♥ Like
           </button>
-        </div>
+        </div>}
       </div>
     </main>
   )

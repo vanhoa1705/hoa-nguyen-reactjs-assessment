@@ -22,6 +22,10 @@ export async function fetchBreedsPage(page: number): Promise<Breed[]> {
   return apiFetch<Breed[]>(`/breeds?limit=${BREEDS_PAGE_LIMIT}&page=${page}`)
 }
 
+export async function fetchBreed(breedId: string): Promise<Breed> {
+  return apiFetch<Breed>(`/breeds/${breedId}`)
+}
+
 export async function fetchBreedImage(imageId: string): Promise<BreedImage> {
   return apiFetch<BreedImage>(`/images/${imageId}`)
 }

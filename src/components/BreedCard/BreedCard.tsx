@@ -10,7 +10,6 @@ interface BreedCardProps {
   onLike: () => void
   onDislike: () => void
   onSuperLike?: () => void
-  onUndo?: () => void
   onPress: () => void
   onDragOffset?: (x: number) => void
   isPending?: boolean
@@ -22,7 +21,6 @@ export default function BreedCard({
   onLike,
   onDislike,
   onSuperLike,
-  onUndo,
   onPress,
   onDragOffset,
   isPending,
@@ -77,17 +75,7 @@ export default function BreedCard({
         if (!wasDraggingRef.current) onPress()
         wasDraggingRef.current = false
       }}
-      onKeyDown={(event) => {
-        if (isPending) return
-        if (event.key === 'ArrowRight') onLike()
-        if (event.key === 'ArrowLeft') onDislike()
-        if (event.key === 'ArrowUp') {
-          event.preventDefault()
-          onSuperLike?.()
-        }
-        if (event.key === 'Enter') onPress()
-      }}
-      className="relative w-full aspect-[3/4.15] rounded-[22px] overflow-hidden select-none cursor-grab active:cursor-grabbing"
+className="relative w-full aspect-[3/4.15] rounded-[22px] overflow-hidden select-none cursor-grab active:cursor-grabbing"
     >
       <div
         className="absolute inset-0 bg-center"
@@ -100,22 +88,6 @@ export default function BreedCard({
           backgroundColor: '#e8e6e1',
         }}
       />
-
-      {onUndo && (
-        <button
-          type="button"
-          aria-label="Undo"
-          disabled={isPending}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation()
-            onUndo()
-          }}
-          className="absolute left-3 top-3 z-[8] grid h-[52px] w-[52px] place-items-center rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-muted shadow-[0_12px_24px_-14px_rgba(20,22,26,.7)] backdrop-blur-md transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          ↺
-        </button>
-      )}
 
       {onSuperLike && (
         <button

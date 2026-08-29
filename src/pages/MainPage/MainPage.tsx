@@ -1,11 +1,11 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useMotionValue, useTransform } from 'framer-motion'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { useBreeds } from '../../hooks/useBreeds'
+import { BREEDS_PAGE_LIMIT } from '../../constants/api'
 import { useVoteActions } from '../../hooks/useVoteActions'
+import { useVotes } from '../../hooks/useVotes'
 import { useSwipeStore } from '../../stores/swipeStore'
-import { fetchBreedImage } from '../../api/dogApi'
 import BreedCard from '../../components/BreedCard'
 import SwipeButtons from '../../components/SwipeButtons'
 import Skeleton from '../../components/Skeleton'
@@ -28,18 +28,44 @@ function formatMeasurement(value: string | undefined, unit: string) {
 
 export default function MainPage() {
   const navigate = useNavigate()
-  const { data: breeds, isLoading, isError, refetch } = useBreeds()
-  const { currentBreedId, isDone, votes, undo, reset } = useSwipeStore()
+  const { data: breeds, isLoading, isError, refetch, fetchNextPage, hasNextPage } = useBreeds()
+  const { currentBreedId, isDone } = useSwipeStore()
   const { vote, isPending } = useVoteActions(breeds ?? [])
+  const { data: apiVotes, isSuccess: votesLoaded } = useVotes()
+
+  // Sync swipe position with API: skip breeds already voted (cross-device safe)
+  useEffect(() => {
+    if (!breeds?.length || !votesLoaded || isDone) return
+    const votedIds = new Set((apiVotes ?? []).map((v) => v.image_id))
+    const currentBreed = breeds.find((b) => String(b.id) === currentBreedId)
+    const alreadyVoted = currentBreed?.reference_image_id
+      ? votedIds.has(currentBreed.reference_image_id)
+      : false
+    if (currentBreedId !== null && !alreadyVoted) return
+    const firstUnvoted = breeds.find(
+      (b) => !b.reference_image_id || !votedIds.has(b.reference_image_id),
+    )
+    if (firstUnvoted) {
+      useSwipeStore.setState({ currentBreedId: String(firstUnvoted.id) })
+    } else {
+      useSwipeStore.setState({ isDone: true })
+    }
+  }, [breeds, apiVotes, votesLoaded, currentBreedId, isDone])
+
+  // Chain-fetch pages until breeds list covers all voted items
+  useEffect(() => {
+    if (!votesLoaded || !hasNextPage) return
+    const votedCount = new Set((apiVotes ?? []).map((v) => v.image_id)).size
+    const pagesNeeded = Math.floor(votedCount / BREEDS_PAGE_LIMIT)
+    const pagesLoaded = Math.ceil((breeds?.length ?? 0) / BREEDS_PAGE_LIMIT)
+    if (pagesLoaded <= pagesNeeded) void fetchNextPage()
+  }, [votesLoaded, apiVotes, breeds?.length, hasNextPage, fetchNextPage])
 
   const dragX = useMotionValue(0)
   const likeScale = useTransform(dragX, [0, 120], [1, 1.35])
   const dislikeScale = useTransform(dragX, [-120, 0], [1.35, 1])
 
-  const likeCount = useMemo(() => Object.values(votes).filter((v) => v === 1).length, [votes])
-  const nopeCount = useMemo(() => Object.values(votes).filter((v) => v === -1).length, [votes])
-
-  const currentBreed = useMemo(() => {
+const currentBreed = useMemo(() => {
     if (!breeds || breeds.length === 0) return undefined
     if (!currentBreedId) return breeds[0]
     return breeds.find((b) => String(b.id) === currentBreedId) ?? breeds[0]
@@ -51,23 +77,38 @@ export default function MainPage() {
     return breeds.findIndex((b) => String(b.id) === currentBreedId)
   }, [breeds, currentBreedId])
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!currentBreed || isPending || isDone) return
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.key === 'ArrowRight') vote(currentBreed, 1)
+      if (e.key === 'ArrowLeft') vote(currentBreed, -1)
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        vote(currentBreed, 2)
+      }
+      if (e.key === 'Enter') navigate(`/breeds/${currentBreed.id}`)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [currentBreed, isPending, isDone, vote, navigate])
+
   const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0
-  const nextBreed = breeds?.[safeCurrentIndex + 1]
-  const remaining = Math.max((breeds?.length ?? 0) - safeCurrentIndex, 0)
 
-  const { data: image } = useQuery({
-    queryKey: ['image', currentBreed?.reference_image_id],
-    queryFn: () => fetchBreedImage(currentBreed!.reference_image_id!),
-    enabled: !!currentBreed?.reference_image_id,
-    staleTime: 5 * 60 * 1000,
-  })
+  // Prefetch next page when within 10 of loaded end
+  useEffect(() => {
+    if (!hasNextPage || !breeds?.length) return
+    if (safeCurrentIndex >= breeds.length - 10) void fetchNextPage()
+  }, [safeCurrentIndex, breeds?.length, hasNextPage, fetchNextPage])
+  const imageUrl = currentBreed?.image?.url
 
-  useQuery({
-    queryKey: ['image', nextBreed?.reference_image_id],
-    queryFn: () => fetchBreedImage(nextBreed!.reference_image_id!),
-    enabled: !!nextBreed?.reference_image_id,
-    staleTime: 5 * 60 * 1000,
-  })
+  // Preload next breed's image into browser cache
+  useEffect(() => {
+    const nextUrl = breeds?.[safeCurrentIndex + 1]?.image?.url
+    if (!nextUrl) return
+    const img = new Image()
+    img.src = nextUrl
+  }, [safeCurrentIndex, breeds])
 
   return (
     <>
@@ -90,7 +131,6 @@ export default function MainPage() {
             }}
           >
             <span>Explore</span>
-            <span className="font-mono text-[11px] opacity-55">{remaining}</span>
           </button>
           <Link
             to="/history"
@@ -103,7 +143,9 @@ export default function MainPage() {
             }}
           >
             <span>Collection</span>
-            <span className="font-mono text-[11px] opacity-55">{Object.keys(votes).length}</span>
+            <span className="font-mono text-[11px] opacity-55">
+              {new Set((apiVotes ?? []).map((v) => v.image_id)).size}
+            </span>
           </Link>
           <div
             className="mt-[18px] rounded-2xl border border-ink/10 bg-white p-3.5"
@@ -181,12 +223,6 @@ export default function MainPage() {
                   >
                     Open collection
                   </Link>
-                  <button
-                    onClick={reset}
-                    className="rounded-[13px] border border-ink/10 bg-transparent px-4 py-2.5 text-[13.5px] font-medium text-ink"
-                  >
-                    Start over
-                  </button>
                 </div>
               </div>
             </div>
@@ -200,11 +236,10 @@ export default function MainPage() {
               >
                 <BreedCard
                   breed={currentBreed}
-                  imageUrl={image?.url}
+                  imageUrl={imageUrl}
                   onLike={() => vote(currentBreed, 1)}
                   onDislike={() => vote(currentBreed, -1)}
                   onSuperLike={() => vote(currentBreed, 2)}
-                  onUndo={undo}
                   onPress={() => navigate(`/breeds/${currentBreed.id}`)}
                   onDragOffset={(x) => dragX.set(x)}
                   isPending={isPending}
@@ -223,7 +258,7 @@ export default function MainPage() {
                 className="font-mono text-[10.5px] tracking-[.06em] text-muted text-center"
                 data-testid="hint-line"
               >
-                Swipe right to like, left to pass · {safeCurrentIndex + 1} / {breeds?.length ?? 0}
+                Swipe right to like, left to pass
               </p>
             </>
           )}
@@ -298,16 +333,6 @@ export default function MainPage() {
               >
                 View details
               </button>
-            </div>
-
-            <div className="rounded-[18px] border border-dashed border-ink/10 px-4 py-3.5">
-              <span className="font-mono text-[9.5px] tracking-[.1em] uppercase text-muted">
-                Progress
-              </span>
-              <p className="mt-2 text-[12.5px] leading-relaxed text-muted">
-                {safeCurrentIndex + 1} / {breeds?.length ?? 0} breeds · {likeCount} liked ·{' '}
-                {nopeCount} passed
-              </p>
             </div>
           </aside>
         )}

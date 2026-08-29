@@ -1,18 +1,21 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { QueryClient } from '@tanstack/react-query'
 import DetailsPage from './DetailsPage'
 import { useSwipeStore } from '../../stores/swipeStore'
 import { renderWithProviders } from '../../test/utils'
 import type { Breed } from '../../types/breed'
+import type { InfiniteData } from '@tanstack/react-query'
 
 vi.mock('../../api/dogApi', () => ({
-  fetchBreedsPage: vi.fn(),
+  fetchBreed: vi.fn(),
   fetchBreedImage: vi.fn(),
   postVote: vi.fn(),
+  fetchVotes: vi.fn(),
 }))
 
-import { fetchBreedsPage, fetchBreedImage, postVote } from '../../api/dogApi'
+import { fetchBreed, fetchBreedImage, postVote, fetchVotes } from '../../api/dogApi'
 
 const breeds: Breed[] = [
   {
@@ -35,22 +38,35 @@ const breeds: Breed[] = [
   },
 ]
 
+function makeQueryClient() {
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 5000 }, mutations: { retry: false } },
+  })
+  qc.setQueryData<InfiniteData<Breed[]>>(['breeds'], { pages: [breeds], pageParams: [0] })
+  return qc
+}
+
 function renderDetails(breedId: string) {
   return renderWithProviders(<DetailsPage />, {
     initialEntries: [`/breeds/${breedId}`],
     routePath: '/breeds/:id',
+    queryClient: makeQueryClient(),
   })
 }
 
 beforeEach(() => {
   useSwipeStore.setState({ currentBreedId: null, isDone: false })
-  vi.mocked(fetchBreedsPage).mockResolvedValue(breeds)
+  vi.mocked(fetchBreed).mockImplementation((id) => {
+    const breed = breeds.find((b) => String(b.id) === id)
+    return breed ? Promise.resolve(breed) : Promise.reject(new Error('Not found'))
+  })
   vi.mocked(fetchBreedImage).mockResolvedValue({
     id: 'img-42',
     url: 'https://example.com/beagle.jpg',
     width: 800,
     height: 600,
   })
+  vi.mocked(fetchVotes).mockResolvedValue([])
   vi.mocked(postVote).mockResolvedValue({ id: 1, message: 'SUCCESS' })
 })
 
@@ -83,15 +99,19 @@ describe('DetailsPage', () => {
     await waitFor(() => screen.getByRole('button', { name: 'Like' }))
     await userEvent.click(screen.getByRole('button', { name: 'Like' }))
     await waitFor(() =>
-      expect(postVote).toHaveBeenCalledWith({ imageId: 'img-42', value: 1 }, expect.any(Object)),
+      expect(postVote).toHaveBeenCalledWith(
+        { imageId: 'img-42', value: 1, breedId: '42' },
+        expect.any(Object),
+      ),
     )
   })
 
   it('advances store when vote submitted', async () => {
+    useSwipeStore.setState({ currentBreedId: '42' })
     renderDetails('42')
     await waitFor(() => screen.getByRole('button', { name: 'Dislike' }))
     await userEvent.click(screen.getByRole('button', { name: 'Dislike' }))
-    expect(useSwipeStore.getState().currentBreedId).toBe('43')
+    await waitFor(() => expect(useSwipeStore.getState().currentBreedId).toBe('43'))
   })
 
   it('shows not-found message for unknown breed id', async () => {

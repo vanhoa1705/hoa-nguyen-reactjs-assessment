@@ -41,7 +41,7 @@ describe('useVoteActions', () => {
     })
 
     await waitFor(() =>
-      expect(postVote).toHaveBeenCalledWith({ imageId: 'img-1', value: 1 }, expect.any(Object)),
+      expect(postVote).toHaveBeenCalledWith({ imageId: 'img-1', value: 1, breedId: '1' }, expect.any(Object)),
     )
   })
 

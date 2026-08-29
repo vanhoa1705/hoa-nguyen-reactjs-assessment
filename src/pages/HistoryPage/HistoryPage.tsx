@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { useBreeds } from '../../hooks/useBreeds'
-import { useSwipeStore } from '../../stores/swipeStore'
+import { useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { useVotes } from '../../hooks/useVotes'
 import { fetchBreedImage } from '../../api/dogApi'
+import Skeleton from '../../components/Skeleton'
 import type { Breed } from '../../types/breed'
+import type { VoteValue } from '../../types/vote'
 
 type Filter = 'all' | '1' | '2' | '-1'
 
@@ -22,26 +23,39 @@ const BADGE: Record<number, { icon: string; color: string }> = {
 }
 
 function CollectionCard({
-  breed,
+  imageId,
   voteValue,
-  onClick,
 }: {
-  breed: Breed
-  voteValue: number
-  onClick: () => void
+  imageId: string
+  voteValue: VoteValue
 }) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
   const { data: image } = useQuery({
-    queryKey: ['image', breed.reference_image_id],
-    queryFn: () => fetchBreedImage(breed.reference_image_id!),
-    enabled: !!breed.reference_image_id,
-    staleTime: 5 * 60 * 1000,
+    queryKey: ['image', imageId],
+    queryFn: () => fetchBreedImage(imageId),
+    staleTime: Infinity,
   })
 
   const badge = BADGE[voteValue]
 
+  // Prefer breed from image response; fall back to breeds cache
+  const breed =
+    image?.breeds?.[0] ??
+    (() => {
+      const cached = queryClient.getQueryData<InfiniteData<Breed[]>>(['breeds'])
+      return cached?.pages.flat().find((b) => b.reference_image_id === imageId)
+    })()
+
+  function handleClick() {
+    const breedId = breed?.id
+    if (breedId) navigate(`/breeds/${breedId}`)
+  }
+
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className="overflow-hidden rounded-[18px] border border-ink/10 bg-white text-left transition-all hover:-translate-y-1"
       style={{ boxShadow: '0 2px 6px rgba(20,22,26,.05)' }}
     >
@@ -63,9 +77,9 @@ function CollectionCard({
         </span>
       </div>
       <div className="px-3 pb-3.5 pt-3">
-        <div className="text-[15px] font-bold tracking-tight">{breed.name}</div>
+        <div className="text-[15px] font-bold tracking-tight">{breed?.name ?? '—'}</div>
         <div className="mt-0.5 font-mono text-[10.5px] text-muted">
-          {[breed.breed_group, breed.weight ? `${breed.weight.metric} kg` : undefined]
+          {[breed?.breed_group, breed?.weight ? `${breed.weight.metric} kg` : undefined]
             .filter(Boolean)
             .join(' · ')}
         </div>
@@ -75,20 +89,22 @@ function CollectionCard({
 }
 
 export default function HistoryPage() {
-  const navigate = useNavigate()
-  const { data: breeds } = useBreeds()
-  const votes = useSwipeStore((s) => s.votes)
+  const { data: apiVotes = [], isLoading } = useVotes()
   const [filter, setFilter] = useState<Filter>('all')
 
-  const collection = (breeds ?? []).filter((b) => {
-    const v = votes[String(b.id)]
-    if (v === undefined) return false
-    if (filter === 'all') return true
-    return String(v) === filter
-  })
+  const collection = useMemo(() => {
+    const latestByImage = apiVotes.reduce<Record<string, (typeof apiVotes)[number]>>(
+      (acc, v) => ({ ...acc, [v.image_id]: v }),
+      {},
+    )
+
+    return Object.values(latestByImage).filter(
+      (v) => filter === 'all' || String(v.value) === filter,
+    )
+  }, [apiVotes, filter])
 
   return (
-    <div className="flex h-screen flex-col bg-bg">
+    <div className="flex flex-1 flex-col overflow-hidden">
       <div className="flex flex-1 justify-center overflow-hidden px-5">
         <div className="flex w-full max-w-[720px] animate-df-in flex-col pt-6">
           {/* Header */}
@@ -134,14 +150,25 @@ export default function HistoryPage() {
 
           {/* Grid */}
           <div className="flex-1 overflow-y-auto pb-6 -mx-5 px-5">
-            {collection.length > 0 ? (
+            {isLoading ? (
               <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
-                {collection.map((b) => (
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="overflow-hidden rounded-[18px] border border-ink/10 bg-white">
+                    <Skeleton className="h-44 rounded-none" />
+                    <div className="px-3 pb-3.5 pt-3 flex flex-col gap-2">
+                      <Skeleton className="h-4 w-3/4 rounded-md" />
+                      <Skeleton className="h-3 w-1/2 rounded-md" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : collection.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
+                {collection.map((v) => (
                   <CollectionCard
-                    key={b.id}
-                    breed={b}
-                    voteValue={votes[String(b.id)]}
-                    onClick={() => navigate(`/breeds/${b.id}`)}
+                    key={v.image_id}
+                    imageId={v.image_id}
+                    voteValue={v.value}
                   />
                 ))}
               </div>

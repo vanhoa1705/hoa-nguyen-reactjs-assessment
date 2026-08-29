@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifySwipe, isClick } from './swipe'
+import { classifySwipe } from './swipe'
 
 describe('classifySwipe', () => {
   it('returns none for small offset and low velocity', () => {
@@ -23,15 +23,3 @@ describe('classifySwipe', () => {
   })
 })
 
-describe('isClick', () => {
-  it('returns true for offset within threshold', () => {
-    expect(isClick(3)).toBe(true)
-    expect(isClick(-3)).toBe(true)
-    expect(isClick(0)).toBe(true)
-  })
-
-  it('returns false for offset beyond threshold', () => {
-    expect(isClick(10)).toBe(false)
-    expect(isClick(-10)).toBe(false)
-  })
-})

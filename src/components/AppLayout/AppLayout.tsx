@@ -1,14 +1,6 @@
-import { useMemo } from 'react'
 import { Link, Outlet } from 'react-router-dom'
-import { useSwipeStore } from '../../stores/swipeStore'
 
 export default function AppLayout() {
-  const { votes, reset } = useSwipeStore()
-
-  const likeCount = useMemo(() => Object.values(votes).filter((v) => v === 1).length, [votes])
-  const nopeCount = useMemo(() => Object.values(votes).filter((v) => v === -1).length, [votes])
-  const superCount = useMemo(() => Object.values(votes).filter((v) => v === 2).length, [votes])
-
   return (
     <div className="flex h-screen flex-col bg-bg overflow-hidden">
       <header
@@ -31,22 +23,6 @@ export default function AppLayout() {
         </Link>
 
         <div className="flex-1" />
-
-        <div className="flex items-center gap-2 rounded-full bg-ink/5 px-2.5 py-1.5 font-mono text-[11px]">
-          <span className="text-nope">✕ {nopeCount}</span>
-          <span className="opacity-30">·</span>
-          <span className="text-accent">♥ {likeCount}</span>
-          <span className="opacity-30">·</span>
-          <span className="text-super">★ {superCount}</span>
-        </div>
-
-        <button
-          onClick={reset}
-          title="Clear saved progress"
-          className="rounded-[11px] border border-ink/10 bg-white px-3 py-1.5 text-[12px] font-medium text-muted hover:border-ink hover:text-ink transition-colors"
-        >
-          Reset
-        </button>
       </header>
 
       <Outlet />
