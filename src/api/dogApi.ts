@@ -8,7 +8,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: DOG_API_KEY,
+      'x-api-key': DOG_API_KEY,
       ...options?.headers,
     },
   })

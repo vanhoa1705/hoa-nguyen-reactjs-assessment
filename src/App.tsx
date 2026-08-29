@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import ErrorBoundary from './components/ErrorBoundary'
+import AppLayout from './components/AppLayout/AppLayout'
 import MainPage from './pages/MainPage'
 import DetailsPage from './pages/DetailsPage'
 
@@ -20,10 +21,12 @@ export default function App() {
         <ErrorBoundary>
           <Suspense fallback={null}>
             <Routes>
-              <Route path="/" element={<MainPage />} />
-              <Route path="/breeds/:id" element={<DetailsPage />} />
-              <Route path="/history" element={<HistoryPage />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<MainPage />} />
+                <Route path="/breeds/:id" element={<DetailsPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
             </Routes>
           </Suspense>
         </ErrorBoundary>

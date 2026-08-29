@@ -7,7 +7,12 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       globals: true,
+      clearMocks: true,
       setupFiles: ['./src/test/setup.ts'],
+      env: {
+        VITE_DOG_API_KEY: 'test-api-key',
+        VITE_SUB_ID: 'test-sub-id',
+      },
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html'],

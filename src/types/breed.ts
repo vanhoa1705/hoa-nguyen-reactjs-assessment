@@ -8,6 +8,11 @@ export interface Breed {
   weight: { imperial: string; metric: string }
   height: { imperial: string; metric: string }
   reference_image_id?: string
+  description?: string
+  history?: string
+  alt_names?: string
+  origin?: string
+  wikipedia_url?: string
 }
 
 export interface BreedImage {
