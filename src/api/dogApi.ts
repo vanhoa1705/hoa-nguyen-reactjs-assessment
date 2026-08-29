@@ -45,6 +45,5 @@ export async function postVote(payload: VotePayload): Promise<VoteResponse> {
 export async function fetchVotes(page = 0): Promise<VoteRecord[]> {
   return apiFetch<VoteRecord[]>(
     `/votes?sub_id=${SUB_ID}&limit=${VOTES_PAGE_LIMIT}&page=${page}&order=ASC`,
-    { cache: 'no-store' },
   )
 }

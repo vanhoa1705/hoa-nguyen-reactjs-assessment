@@ -63,7 +63,7 @@ describe('useBreeds', () => {
 
     expect(fetchBreedsPage).toHaveBeenCalledTimes(1)
     expect(fetchBreedsPage).toHaveBeenCalledWith(2)
-    expect(result.current.data?.map((b) => b.id)).toEqual([41])
+    expect(result.current.data?.map((b) => b.id)).toEqual([2 * BREEDS_PAGE_LIMIT + 1])
   })
 
   it('hasNextPage is false when last page has fewer than limit items', async () => {

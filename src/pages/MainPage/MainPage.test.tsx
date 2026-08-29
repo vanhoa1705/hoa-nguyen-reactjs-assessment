@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import MainPage from './MainPage'
 import { useSwipeStore } from '../../stores/swipeStore'
 import { renderWithProviders } from '../../test/utils'
+import { BREEDS_PAGE_LIMIT } from '../../constants/api'
 import type { Breed } from '../../types/breed'
 
 vi.mock('framer-motion', () => ({
@@ -84,8 +85,10 @@ describe('MainPage', () => {
   })
 
   it('loads only the breed page matching the number of voted items', async () => {
+    const votedCount = BREEDS_PAGE_LIMIT * 2 + 7
+
     vi.mocked(fetchVotes).mockResolvedValue(
-      Array.from({ length: 47 }, (_, i) => ({
+      Array.from({ length: votedCount }, (_, i) => ({
         id: i + 1,
         image_id: `img-${i + 1}`,
         value: 1,
@@ -95,12 +98,12 @@ describe('MainPage', () => {
     )
     vi.mocked(fetchBreedsPage).mockResolvedValue([
       {
-        id: 48,
+        id: votedCount + 1,
         name: 'Page Three Breed',
         life_span: '10 - 12 years',
         weight: { imperial: '6', metric: '3' },
         height: { imperial: '9', metric: '23' },
-        reference_image_id: 'img-48',
+        reference_image_id: `img-${votedCount + 1}`,
       },
     ])
 

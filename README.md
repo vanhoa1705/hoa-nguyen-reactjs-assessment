@@ -31,7 +31,7 @@ pnpm lint:fix   # auto-fix lint and formatting issues
 - **Keyboard shortcuts** — `←` pass · `→` like · `↑` super like · `↵` view details
 - **Details page** — full breed info: weight, height, temperament, bred for, life span
 - **Collection** — browse voted breeds, filter by like / pass / super like
-- **Progress persistence** — swipe state saved to localStorage, survives page refresh and device switch
+- **Progress persistence** — swipe state is saved to localStorage and vote history is restored from The Dog API
 
 ## Library Choices
 
@@ -49,20 +49,22 @@ pnpm lint:fix   # auto-fix lint and formatting issues
 
 **API key in header, not query string** — The Dog API accepts `x-api-key` as a request header. The `.env.example` documents both `VITE_DOG_API_KEY` (the key) and `VITE_SUB_ID` (the subscriber ID used to namespace votes, needed to fetch your own history).
 
+**Votes cache with mutation refresh** — `GET /votes` is cached for 30 seconds so homepage/history do not refetch on every render. After a like, pass, or super like succeeds, the votes query is invalidated and refetched in the background. Existing collection data stays visible while the fresh response loads, so the total count does not briefly drop to zero.
+
 **`advance` reads current position from store** — rather than passing the current index as a parameter, `advance(breeds, hasNextPage)` derives the next breed from `currentBreedId` in the store. When the user votes the last breed of a loaded page but more pages exist (`hasNextPage=true`), `isDone` is not set — the sync effect resumes once the next page arrives.
 
 **Image preloading** — the next breed's `image.url` (returned inline by the breeds list endpoint) is loaded into browser cache via `new Image()` while the user views the current card. No extra API call needed.
 
-**Infinite pagination** — breeds are fetched 50 at a time. The next page prefetches when the user is within 10 cards of the end. On session restore, the sync effect fetches enough pages to cover all previously voted breeds before resuming.
+**Vote-aware breed pagination** — breeds are fetched 50 at a time. On homepage load, the initial breed page is calculated from the number of unique voted image IDs (`Math.floor(votedCount / BREEDS_PAGE_LIMIT)`), so a user with 47 votes starts from page 0 while a user with 120 votes starts from page 2. The next page is fetched only after the current page has no remaining unvoted breeds.
 
 ## Project Structure
 
 ```
 src/
-  api/          dogApi.ts — all fetch calls, typed responses
+  api/          dogApi.ts - all fetch calls, typed responses
   components/   BreedCard, SwipeButtons, Skeleton
-  constants/    swipe thresholds
-  hooks/        useBreeds, useVoteActions
+  constants/    API settings and swipe thresholds
+  hooks/        useBreeds, useVotes, useVoteActions
   pages/        MainPage, DetailsPage, HistoryPage
   stores/       swipeStore (Zustand + persist)
   types/        Breed, Vote
@@ -71,7 +73,7 @@ src/
 
 ## Tests
 
-42 unit tests covering store logic, vote actions, swipe classification, and page-level interactions. Framer Motion is mocked in page tests so drag behavior is tested via keyboard events and button clicks.
+46 unit tests covering API calls, store logic, vote actions, breed pagination, swipe classification, and page-level interactions. Framer Motion is mocked in page tests so drag behavior is tested via keyboard events and button clicks.
 
 ```bash
 pnpm test

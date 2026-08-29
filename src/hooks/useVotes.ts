@@ -5,11 +5,7 @@ export function useVotes() {
   const query = useQuery({
     queryKey: ['votes'],
     queryFn: () => fetchVotes(),
-    staleTime: 0,
-    gcTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    staleTime: 30_000,
   })
 
   return {
