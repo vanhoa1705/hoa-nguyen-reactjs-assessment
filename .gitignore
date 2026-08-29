@@ -1,0 +1,20 @@
+# Dependencies
+node_modules
+
+# Build
+dist
+coverage
+
+# Env
+.env
+.env.local
+
+# Editor
+.DS_Store
+*.local
+
+# Logs
+*.log
+
+design
+docs
