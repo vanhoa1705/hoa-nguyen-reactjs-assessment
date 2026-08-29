@@ -64,7 +64,8 @@ describe('fetchVotes', () => {
     const fetchMock = mockFetch([])
     vi.stubGlobal('fetch', fetchMock)
     await fetchVotes()
-    const [url] = fetchMock.mock.calls[0] as [string]
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toContain('sub_id=test-sub-id')
+    expect(init.cache).toBe('no-store')
   })
 })

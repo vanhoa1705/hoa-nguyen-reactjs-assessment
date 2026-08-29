@@ -1,8 +1,4 @@
-import {
-  CLICK_MAX_OFFSET,
-  SWIPE_OFFSET_THRESHOLD,
-  SWIPE_VELOCITY_THRESHOLD,
-} from '../constants/swipe'
+import { SWIPE_OFFSET_THRESHOLD, SWIPE_VELOCITY_THRESHOLD } from '../constants/swipe'
 
 export type SwipeDirection = 'like' | 'dislike' | 'none'
 

@@ -83,6 +83,33 @@ describe('MainPage', () => {
     await waitFor(() => expect(screen.getAllByText('Affenpinscher').length).toBeGreaterThan(0))
   })
 
+  it('loads only the breed page matching the number of voted items', async () => {
+    vi.mocked(fetchVotes).mockResolvedValue(
+      Array.from({ length: 47 }, (_, i) => ({
+        id: i + 1,
+        image_id: `img-${i + 1}`,
+        value: 1,
+        sub_id: 'test-sub-id',
+        created_at: '2026-08-30T00:00:00.000Z',
+      })),
+    )
+    vi.mocked(fetchBreedsPage).mockResolvedValue([
+      {
+        id: 48,
+        name: 'Page Three Breed',
+        life_span: '10 - 12 years',
+        weight: { imperial: '6', metric: '3' },
+        height: { imperial: '9', metric: '23' },
+        reference_image_id: 'img-48',
+      },
+    ])
+
+    renderWithProviders(<MainPage />)
+
+    await waitFor(() => expect(fetchBreedsPage).toHaveBeenCalledWith(2))
+    expect(fetchBreedsPage).toHaveBeenCalledTimes(1)
+  })
+
   it('calls postVote with value 1 when like button clicked', async () => {
     renderWithProviders(<MainPage />)
     await waitFor(() => screen.getByRole('button', { name: 'Like breed' }))

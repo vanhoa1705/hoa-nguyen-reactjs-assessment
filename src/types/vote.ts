@@ -3,7 +3,7 @@ export type VoteValue = -1 | 1 | 2
 export interface VotePayload {
   imageId: string
   value: VoteValue
-  breedId: string
+  breedId?: string
 }
 
 export interface VoteResponse {

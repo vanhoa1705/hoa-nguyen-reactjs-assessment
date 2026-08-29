@@ -1,9 +1,10 @@
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import Skeleton from '../../components/Skeleton'
-import { useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useVotes } from '../../hooks/useVotes'
 import { useSwipeStore } from '../../stores/swipeStore'
 import { fetchBreed, fetchBreedImage, postVote } from '../../api/dogApi'
+import { BREEDS_PAGE_LIMIT } from '../../constants/api'
 import type { Breed } from '../../types/breed'
 import type { VoteValue } from '../../types/vote'
 
@@ -26,14 +27,42 @@ export default function DetailsPage() {
   const advance = useSwipeStore((s) => s.advance)
   const { data: apiVotes = [] } = useVotes()
 
+  function getAllCachedBreeds(): Breed[] {
+    const all: Breed[] = []
+    for (let page = 0; ; page++) {
+      const data = queryClient.getQueryData<Breed[]>(['breeds', 'page', page])
+      if (!data) break
+      all.push(...data)
+      if (data.length < BREEDS_PAGE_LIMIT) break
+    }
+    return all
+  }
+
+  function getBreedsHasNextPage(): boolean {
+    let lastPage: Breed[] | undefined
+    for (let page = 0; ; page++) {
+      const data = queryClient.getQueryData<Breed[]>(['breeds', 'page', page])
+      if (!data) break
+      lastPage = data
+      if (data.length < BREEDS_PAGE_LIMIT) break
+    }
+    return lastPage ? lastPage.length === BREEDS_PAGE_LIMIT : false
+  }
+
   const { data: breed, isLoading } = useQuery({
     queryKey: ['breed', id],
     queryFn: () => fetchBreed(id!),
     enabled: !!id,
     staleTime: Infinity,
     initialData: () => {
-      const cached = queryClient.getQueryData<InfiniteData<Breed[]>>(['breeds'])
-      return cached?.pages.flat().find((b) => String(b.id) === id)
+      for (let page = 0; ; page++) {
+        const data = queryClient.getQueryData<Breed[]>(['breeds', 'page', page])
+        if (!data) break
+        const found = data.find((b) => String(b.id) === id)
+        if (found) return found
+        if (data.length < BREEDS_PAGE_LIMIT) break
+      }
+      return undefined
     },
   })
 
@@ -57,26 +86,25 @@ export default function DetailsPage() {
     else navigate(-1)
   }
 
-  function getBreeds() {
-    const cached = queryClient.getQueryData<InfiniteData<Breed[]>>(['breeds'])
-    return cached?.pages.flat() ?? []
-  }
-
-  const { mutate } = useMutation({
+  const {
+    mutate,
+    isPending,
+    isError: voteError,
+  } = useMutation({
     mutationFn: postVote,
     onSuccess: () => {
-      advance(getBreeds())
+      advance(getAllCachedBreeds(), getBreedsHasNextPage())
       void queryClient.invalidateQueries({ queryKey: ['votes'] })
       goBack()
     },
   })
 
   function handleVote(value: VoteValue) {
-    if (!breed) return
+    if (!breed || isPending) return
     if (breed.reference_image_id) {
       mutate({ imageId: breed.reference_image_id, value, breedId: String(breed.id) })
     } else {
-      advance(getBreeds())
+      advance(getAllCachedBreeds(), getBreedsHasNextPage())
       goBack()
     }
   }
@@ -154,14 +182,17 @@ export default function DetailsPage() {
             ‹ Back
           </button>
           {/* Super like — hidden if already voted */}
-          {voteValue === undefined && <button
-            aria-label="Super like"
-            onClick={() => handleVote(2)}
-            className="absolute right-3 top-3 grid h-[52px] w-[52px] place-items-center rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-super backdrop-blur-md transition-transform hover:-translate-y-0.5 hover:border-super"
-            style={{ boxShadow: '0 12px 24px -14px rgba(20,22,26,.7)' }}
-          >
-            ★
-          </button>}
+          {voteValue === undefined && (
+            <button
+              aria-label="Super like"
+              disabled={isPending}
+              onClick={() => handleVote(2)}
+              className="absolute right-3 top-3 grid h-[52px] w-[52px] place-items-center rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-super backdrop-blur-md transition-transform hover:-translate-y-0.5 hover:border-super disabled:opacity-50"
+              style={{ boxShadow: '0 12px 24px -14px rgba(20,22,26,.7)' }}
+            >
+              ★
+            </button>
+          )}
           {/* Name + vote tag */}
           <div className="absolute inset-x-5 bottom-[18px] flex items-end gap-3">
             <h1
@@ -236,23 +267,34 @@ export default function DetailsPage() {
         </div>
 
         {/* Action buttons — hidden if already voted */}
-        {voteValue === undefined && <div className="flex gap-2.5 px-5 pb-[22px] pt-4">
-          <button
-            aria-label="Dislike"
-            onClick={() => handleVote(-1)}
-            className="flex flex-1 h-[52px] items-center justify-center gap-2 rounded-2xl border border-ink/10 bg-white text-[14px] font-medium text-nope hover:border-nope transition-colors"
-          >
-            ✕ Pass
-          </button>
-          <button
-            aria-label="Like"
-            onClick={() => handleVote(1)}
-            className="flex flex-1 h-[52px] items-center justify-center gap-2 rounded-2xl border-none text-[14px] font-medium text-white bg-accent"
-            style={{ boxShadow: '0 12px 24px -14px rgba(46,91,255,.95)' }}
-          >
-            ♥ Like
-          </button>
-        </div>}
+        {voteValue === undefined && (
+          <div className="flex flex-col gap-2 px-5 pb-[22px] pt-4">
+            {voteError && (
+              <p className="text-center text-[12.5px]" style={{ color: '#ff4d6d' }}>
+                Vote failed — please try again.
+              </p>
+            )}
+            <div className="flex gap-2.5">
+              <button
+                aria-label="Dislike"
+                disabled={isPending}
+                onClick={() => handleVote(-1)}
+                className="flex flex-1 h-[52px] items-center justify-center gap-2 rounded-2xl border border-ink/10 bg-white text-[14px] font-medium text-nope hover:border-nope transition-colors disabled:opacity-50"
+              >
+                ✕ Pass
+              </button>
+              <button
+                aria-label="Like"
+                disabled={isPending}
+                onClick={() => handleVote(1)}
+                className="flex flex-1 h-[52px] items-center justify-center gap-2 rounded-2xl border-none text-[14px] font-medium text-white bg-accent disabled:opacity-50"
+                style={{ boxShadow: '0 12px 24px -14px rgba(46,91,255,.95)' }}
+              >
+                ♥ Like
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )

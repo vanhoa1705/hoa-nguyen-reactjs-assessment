@@ -4,6 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 import BreedCard from './BreedCard'
 import type { Breed } from '../../types/breed'
 
+// Capture drag handlers so tests can invoke them directly
+const drag: {
+  onDragStart?: (e: unknown, info: unknown) => void
+  onDrag?: (e: unknown, info: unknown) => void
+  onDragEnd?: (e: unknown, info: unknown) => void
+} = {}
+
 vi.mock('framer-motion', () => ({
   motion: {
     div: ({
@@ -13,26 +20,51 @@ vi.mock('framer-motion', () => ({
       style,
       'aria-disabled': ad,
       'data-testid': dtid,
-      // strip framer-motion-only props to avoid React DOM warnings
       drag: _drag,
       dragConstraints: _dc,
       dragElastic: _de,
-      onDragStart: _ods,
-      onDrag: _od,
-      onDragEnd: _ode,
-      whileDrag: _wd,
+      onDragStart,
+      onDrag,
+      onDragEnd,
+      ...rest
+    }: any) => {
+      if (onDragStart !== undefined) drag.onDragStart = onDragStart
+      if (onDrag !== undefined) drag.onDrag = onDrag
+      if (onDragEnd !== undefined) drag.onDragEnd = onDragEnd
+      return (
+        <div
+          onClick={onClick}
+          className={className}
+          style={style}
+          aria-disabled={ad}
+          data-testid={dtid}
+          {...rest}
+        >
+          {children}
+        </div>
+      )
+    },
+    button: ({
+      children,
+      onClick,
+      style,
+      onPointerDown,
+      type,
+      'aria-label': al,
+      disabled,
       ...rest
     }: any) => (
-      <div
+      <button
+        type={type}
+        aria-label={al}
+        disabled={disabled}
         onClick={onClick}
-        className={className}
+        onPointerDown={onPointerDown}
         style={style}
-        aria-disabled={ad}
-        data-testid={dtid}
         {...rest}
       >
         {children}
-      </div>
+      </button>
     ),
   },
   useMotionValue: (v: number) => v,
@@ -87,5 +119,30 @@ describe('BreedCard', () => {
     render(<BreedCard breed={breed} onLike={vi.fn()} onDislike={vi.fn()} onPress={onPress} />)
     await userEvent.click(screen.getByTestId('breed-card'))
     expect(onPress).toHaveBeenCalledOnce()
+  })
+
+  it('swipe up calls onSuperLike and does not trigger onPress', async () => {
+    const onPress = vi.fn()
+    const onSuperLike = vi.fn()
+    render(
+      <BreedCard
+        breed={breed}
+        onLike={vi.fn()}
+        onDislike={vi.fn()}
+        onPress={onPress}
+        onSuperLike={onSuperLike}
+      />,
+    )
+
+    // Simulate drag start → drag with large y offset → drag end
+    drag.onDragStart?.(null, {})
+    drag.onDrag?.(null, { offset: { x: 0, y: -150 } })
+    drag.onDragEnd?.(null, { offset: { x: 0, y: -150 }, velocity: { x: 0, y: 0 } })
+
+    // Click that framer-motion fires after drag end should be swallowed
+    await userEvent.click(screen.getByTestId('breed-card'))
+
+    expect(onSuperLike).toHaveBeenCalledOnce()
+    expect(onPress).not.toHaveBeenCalled()
   })
 })

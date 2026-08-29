@@ -1,5 +1,5 @@
 import { DOG_API_KEY, SUB_ID } from '../config/env'
-import { API_BASE_URL, BREEDS_PAGE_LIMIT } from '../constants/api'
+import { API_BASE_URL, BREEDS_PAGE_LIMIT, VOTES_PAGE_LIMIT } from '../constants/api'
 import type { Breed, BreedImage } from '../types/breed'
 import type { VotePayload, VoteRecord, VoteResponse } from '../types/vote'
 
@@ -19,7 +19,7 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export async function fetchBreedsPage(page: number): Promise<Breed[]> {
-  return apiFetch<Breed[]>(`/breeds?limit=${BREEDS_PAGE_LIMIT}&page=${page}`)
+  return apiFetch<Breed[]>(`/breeds?limit=${BREEDS_PAGE_LIMIT}&page=${page}&order=ASC`)
 }
 
 export async function fetchBreed(breedId: string): Promise<Breed> {
@@ -42,6 +42,9 @@ export async function postVote(payload: VotePayload): Promise<VoteResponse> {
 }
 // breedId is passed through VotePayload for onSuccess callbacks but not sent to the API
 
-export async function fetchVotes(): Promise<VoteRecord[]> {
-  return apiFetch<VoteRecord[]>(`/votes?sub_id=${SUB_ID}`)
+export async function fetchVotes(page = 0): Promise<VoteRecord[]> {
+  return apiFetch<VoteRecord[]>(
+    `/votes?sub_id=${SUB_ID}&limit=${VOTES_PAGE_LIMIT}&page=${page}&order=ASC`,
+    { cache: 'no-store' },
+  )
 }

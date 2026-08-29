@@ -6,7 +6,6 @@ import DetailsPage from './DetailsPage'
 import { useSwipeStore } from '../../stores/swipeStore'
 import { renderWithProviders } from '../../test/utils'
 import type { Breed } from '../../types/breed'
-import type { InfiniteData } from '@tanstack/react-query'
 
 vi.mock('../../api/dogApi', () => ({
   fetchBreed: vi.fn(),
@@ -42,7 +41,7 @@ function makeQueryClient() {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 5000 }, mutations: { retry: false } },
   })
-  qc.setQueryData<InfiniteData<Breed[]>>(['breeds'], { pages: [breeds], pageParams: [0] })
+  qc.setQueryData<Breed[]>(['breeds', 'page', 0], breeds)
   return qc
 }
 

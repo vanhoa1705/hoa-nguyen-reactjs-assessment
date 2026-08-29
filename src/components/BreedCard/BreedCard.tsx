@@ -26,14 +26,21 @@ export default function BreedCard({
   isPending,
 }: BreedCardProps) {
   const x = useMotionValue(0)
+  const y = useMotionValue(0)
   const rotate = useTransform(x, [-200, 0, 200], [-15, 0, 15])
   const likeOpacity = useTransform(x, [0, 110], [0, 1])
   const dislikeOpacity = useTransform(x, [-110, 0], [1, 0])
+  const superLikeScale = useTransform(y, [-120, 0], [1.35, 1])
   const wasDraggingRef = useRef(false)
 
   function handleDragEnd(_: unknown, info: PanInfo) {
     onDragOffset?.(0)
     if (isPending) return
+    // Swipe up = super like (vertical dominates and exceeds threshold)
+    if (onSuperLike && info.offset.y < -100 && Math.abs(info.offset.y) > Math.abs(info.offset.x)) {
+      onSuperLike()
+      return
+    }
     const direction = classifySwipe(info)
     if (direction === 'like') onLike()
     else if (direction === 'dislike') onDislike()
@@ -48,11 +55,12 @@ export default function BreedCard({
 
   return (
     <motion.div
-      drag="x"
-      dragConstraints={{ left: 0, right: 0 }}
+      drag
+      dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       dragElastic={0.1}
       style={{
         x,
+        y,
         rotate,
         touchAction: 'none',
         boxShadow: '0 24px 50px -20px rgba(20,22,26,.42), 0 2px 6px rgba(20,22,26,.07)',
@@ -66,7 +74,11 @@ export default function BreedCard({
         wasDraggingRef.current = false
       }}
       onDrag={(_: unknown, info: PanInfo) => {
-        if (Math.abs(info.offset.x) > CLICK_MAX_OFFSET) wasDraggingRef.current = true
+        if (
+          Math.abs(info.offset.x) > CLICK_MAX_OFFSET ||
+          Math.abs(info.offset.y) > CLICK_MAX_OFFSET
+        )
+          wasDraggingRef.current = true
         onDragOffset?.(info.offset.x)
       }}
       onDragEnd={handleDragEnd}
@@ -75,7 +87,7 @@ export default function BreedCard({
         if (!wasDraggingRef.current) onPress()
         wasDraggingRef.current = false
       }}
-className="relative w-full aspect-[3/4.15] rounded-[22px] overflow-hidden select-none cursor-grab active:cursor-grabbing"
+      className="relative w-full aspect-[3/4.15] rounded-[22px] overflow-hidden select-none cursor-grab active:cursor-grabbing"
     >
       <div
         className="absolute inset-0 bg-center"
@@ -90,20 +102,21 @@ className="relative w-full aspect-[3/4.15] rounded-[22px] overflow-hidden select
       />
 
       {onSuperLike && (
-        <button
+        <motion.button
           type="button"
           aria-label="Super like breed"
           title="Super like"
           disabled={isPending}
+          style={{ scale: superLikeScale }}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation()
             onSuperLike()
           }}
-          className="absolute right-3 top-3 z-[8] grid h-[52px] w-[52px] place-items-center rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-super shadow-[0_12px_24px_-14px_rgba(20,22,26,.7)] backdrop-blur-md transition-transform hover:-translate-y-0.5 hover:border-super disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute right-3 top-3 z-[8] grid h-[52px] w-[52px] place-items-center rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-super shadow-[0_12px_24px_-14px_rgba(20,22,26,.7)] backdrop-blur-md hover:-translate-y-0.5 hover:border-super disabled:cursor-not-allowed disabled:opacity-50"
         >
           ★
-        </button>
+        </motion.button>
       )}
 
       {/* LIKE stamp */}

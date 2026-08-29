@@ -44,5 +44,12 @@ describe('advance', () => {
     expect(useSwipeStore.getState().isDone).toBe(true)
     expect(useSwipeStore.getState().currentBreedId).toBe('1')
   })
-})
 
+  it('does not set isDone when hasNextPage is true at last loaded breed', () => {
+    const breeds = makeBreeds(2)
+    useSwipeStore.setState({ currentBreedId: '2' })
+    useSwipeStore.getState().advance(breeds, true)
+    expect(useSwipeStore.getState().isDone).toBe(false)
+    expect(useSwipeStore.getState().currentBreedId).toBe('2')
+  })
+})

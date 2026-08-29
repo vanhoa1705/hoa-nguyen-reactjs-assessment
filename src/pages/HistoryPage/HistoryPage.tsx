@@ -1,11 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useVotes } from '../../hooks/useVotes'
 import { fetchBreedImage } from '../../api/dogApi'
+import { BREEDS_PAGE_LIMIT } from '../../constants/api'
 import Skeleton from '../../components/Skeleton'
 import type { Breed } from '../../types/breed'
 import type { VoteValue } from '../../types/vote'
+
+const PAGE_SIZE = 10
 
 type Filter = 'all' | '1' | '2' | '-1'
 
@@ -22,13 +25,7 @@ const BADGE: Record<number, { icon: string; color: string }> = {
   [-1]: { icon: '✕', color: '#E5484D' },
 }
 
-function CollectionCard({
-  imageId,
-  voteValue,
-}: {
-  imageId: string
-  voteValue: VoteValue
-}) {
+function CollectionCard({ imageId, voteValue }: { imageId: string; voteValue: VoteValue }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
 
@@ -44,8 +41,14 @@ function CollectionCard({
   const breed =
     image?.breeds?.[0] ??
     (() => {
-      const cached = queryClient.getQueryData<InfiniteData<Breed[]>>(['breeds'])
-      return cached?.pages.flat().find((b) => b.reference_image_id === imageId)
+      for (let page = 0; ; page++) {
+        const data = queryClient.getQueryData<Breed[]>(['breeds', 'page', page])
+        if (!data) break
+        const found = data.find((b) => b.reference_image_id === imageId)
+        if (found) return found
+        if (data.length < BREEDS_PAGE_LIMIT) break
+      }
+      return undefined
     })()
 
   function handleClick() {
@@ -91,6 +94,17 @@ function CollectionCard({
 export default function HistoryPage() {
   const { data: apiVotes = [], isLoading } = useVotes()
   const [filter, setFilter] = useState<Filter>('all')
+  const [page, setPage] = useState(1)
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    gridRef.current?.scrollTo({ top: 0 })
+  }, [page])
+
+  function handleFilterChange(f: Filter) {
+    setFilter(f)
+    setPage(1)
+  }
 
   const collection = useMemo(() => {
     const latestByImage = apiVotes.reduce<Record<string, (typeof apiVotes)[number]>>(
@@ -103,10 +117,23 @@ export default function HistoryPage() {
     )
   }, [apiVotes, filter])
 
+  const totalPages = Math.max(1, Math.ceil(collection.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const paginated = collection.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
+
+  const paginationPages = Array.from({ length: totalPages }, (_, i) => i + 1)
+    .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+    .reduce<(number | '…')[]>((acc, p, i, arr) => {
+      if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push('…')
+      acc.push(p)
+      return acc
+    }, [])
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      {/* Scrollable area */}
       <div className="flex flex-1 justify-center overflow-hidden px-5">
-        <div className="flex w-full max-w-[720px] animate-df-in flex-col pt-6">
+        <div className="flex w-full max-w-[720px] animate-df-in flex-col overflow-hidden pt-6">
           {/* Header */}
           <div className="mb-4 flex items-center gap-3">
             <Link
@@ -131,7 +158,7 @@ export default function HistoryPage() {
             {FILTERS.map(({ id, label }) => (
               <button
                 key={id}
-                onClick={() => setFilter(id)}
+                onClick={() => handleFilterChange(id)}
                 className="flex flex-1 items-center justify-center rounded-[14px] py-2.5 text-[13px] font-medium transition-colors"
                 style={
                   filter === id
@@ -149,13 +176,16 @@ export default function HistoryPage() {
           </nav>
 
           {/* Grid */}
-          <div className="flex-1 overflow-y-auto pb-6 -mx-5 px-5">
+          <div ref={gridRef} className="flex-1 overflow-y-auto pb-4 -mx-5 px-5">
             {isLoading ? (
               <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="overflow-hidden rounded-[18px] border border-ink/10 bg-white">
+                  <div
+                    key={i}
+                    className="overflow-hidden rounded-[18px] border border-ink/10 bg-white"
+                  >
                     <Skeleton className="h-44 rounded-none" />
-                    <div className="px-3 pb-3.5 pt-3 flex flex-col gap-2">
+                    <div className="flex flex-col gap-2 px-3 pb-3.5 pt-3">
                       <Skeleton className="h-4 w-3/4 rounded-md" />
                       <Skeleton className="h-3 w-1/2 rounded-md" />
                     </div>
@@ -164,12 +194,8 @@ export default function HistoryPage() {
               </div>
             ) : collection.length > 0 ? (
               <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3">
-                {collection.map((v) => (
-                  <CollectionCard
-                    key={v.image_id}
-                    imageId={v.image_id}
-                    voteValue={v.value}
-                  />
+                {paginated.map((v) => (
+                  <CollectionCard key={v.image_id} imageId={v.image_id} voteValue={v.value} />
                 ))}
               </div>
             ) : (
@@ -181,6 +207,57 @@ export default function HistoryPage() {
           </div>
         </div>
       </div>
+
+      {/* Pagination — outside scroll, always visible at bottom */}
+      {totalPages > 1 && !isLoading && (
+        <div className="flex items-center justify-center gap-1.5 px-5 py-4">
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={safePage === 1}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-ink/10 bg-white text-[13px] font-medium text-ink transition-colors hover:border-ink disabled:opacity-30"
+          >
+            ‹
+          </button>
+
+          {paginationPages.map((item, i) =>
+            item === '…' ? (
+              <span key={`ellipsis-${i}`} className="w-9 text-center text-muted">
+                …
+              </span>
+            ) : (
+              <button
+                key={item}
+                onClick={() => setPage(item)}
+                className="flex h-9 w-9 items-center justify-center rounded-xl border text-[13px] font-medium transition-colors"
+                style={
+                  item === safePage
+                    ? {
+                        background: 'var(--accent)',
+                        borderColor: 'var(--accent)',
+                        color: '#fff',
+                        boxShadow: '0 6px 16px -8px rgba(46,91,255,.9)',
+                      }
+                    : {
+                        background: '#fff',
+                        borderColor: 'rgba(20,22,26,.10)',
+                        color: 'var(--ink)',
+                      }
+                }
+              >
+                {item}
+              </button>
+            ),
+          )}
+
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage === totalPages}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-ink/10 bg-white text-[13px] font-medium text-ink transition-colors hover:border-ink disabled:opacity-30"
+          >
+            ›
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -22,4 +22,3 @@ describe('classifySwipe', () => {
     expect(classifySwipe({ offset: { x: -30, y: 0 }, velocity: { x: -250, y: 0 } })).toBe('dislike')
   })
 })
-

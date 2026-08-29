@@ -28,44 +28,48 @@ function formatMeasurement(value: string | undefined, unit: string) {
 
 export default function MainPage() {
   const navigate = useNavigate()
-  const { data: breeds, isLoading, isError, refetch, fetchNextPage, hasNextPage } = useBreeds()
-  const { currentBreedId, isDone } = useSwipeStore()
-  const { vote, isPending } = useVoteActions(breeds ?? [])
   const { data: apiVotes, isSuccess: votesLoaded } = useVotes()
+
+  const votedImageIds = useMemo(() => new Set((apiVotes ?? []).map((v) => v.image_id)), [apiVotes])
+  const initialBreedPage = votesLoaded ? Math.floor(votedImageIds.size / BREEDS_PAGE_LIMIT) : 0
+
+  const {
+    data: breeds,
+    isLoading: breedsLoading,
+    isError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+  } = useBreeds(votesLoaded, initialBreedPage)
+  const isLoading = !votesLoaded || breedsLoading
+  const { currentBreedId, isDone } = useSwipeStore()
+  const { vote, isPending, isError: voteError } = useVoteActions(breeds ?? [], hasNextPage)
 
   // Sync swipe position with API: skip breeds already voted (cross-device safe)
   useEffect(() => {
     if (!breeds?.length || !votesLoaded || isDone) return
-    const votedIds = new Set((apiVotes ?? []).map((v) => v.image_id))
     const currentBreed = breeds.find((b) => String(b.id) === currentBreedId)
     const alreadyVoted = currentBreed?.reference_image_id
-      ? votedIds.has(currentBreed.reference_image_id)
+      ? votedImageIds.has(currentBreed.reference_image_id)
       : false
-    if (currentBreedId !== null && !alreadyVoted) return
+    if (currentBreedId !== null && currentBreed && !alreadyVoted) return
     const firstUnvoted = breeds.find(
-      (b) => !b.reference_image_id || !votedIds.has(b.reference_image_id),
+      (b) => !b.reference_image_id || !votedImageIds.has(b.reference_image_id),
     )
     if (firstUnvoted) {
       useSwipeStore.setState({ currentBreedId: String(firstUnvoted.id) })
-    } else {
+    } else if (hasNextPage) {
+      fetchNextPage()
+    } else if (!hasNextPage) {
       useSwipeStore.setState({ isDone: true })
     }
-  }, [breeds, apiVotes, votesLoaded, currentBreedId, isDone])
-
-  // Chain-fetch pages until breeds list covers all voted items
-  useEffect(() => {
-    if (!votesLoaded || !hasNextPage) return
-    const votedCount = new Set((apiVotes ?? []).map((v) => v.image_id)).size
-    const pagesNeeded = Math.floor(votedCount / BREEDS_PAGE_LIMIT)
-    const pagesLoaded = Math.ceil((breeds?.length ?? 0) / BREEDS_PAGE_LIMIT)
-    if (pagesLoaded <= pagesNeeded) void fetchNextPage()
-  }, [votesLoaded, apiVotes, breeds?.length, hasNextPage, fetchNextPage])
+  }, [breeds, votedImageIds, votesLoaded, currentBreedId, isDone, hasNextPage, fetchNextPage])
 
   const dragX = useMotionValue(0)
   const likeScale = useTransform(dragX, [0, 120], [1, 1.35])
   const dislikeScale = useTransform(dragX, [-120, 0], [1.35, 1])
 
-const currentBreed = useMemo(() => {
+  const currentBreed = useMemo(() => {
     if (!breeds || breeds.length === 0) return undefined
     if (!currentBreedId) return breeds[0]
     return breeds.find((b) => String(b.id) === currentBreedId) ?? breeds[0]
@@ -95,11 +99,6 @@ const currentBreed = useMemo(() => {
 
   const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0
 
-  // Prefetch next page when within 10 of loaded end
-  useEffect(() => {
-    if (!hasNextPage || !breeds?.length) return
-    if (safeCurrentIndex >= breeds.length - 10) void fetchNextPage()
-  }, [safeCurrentIndex, breeds?.length, hasNextPage, fetchNextPage])
   const imageUrl = currentBreed?.image?.url
 
   // Preload next breed's image into browser cache
@@ -253,6 +252,12 @@ const currentBreed = useMemo(() => {
                 dislikeScale={dislikeScale}
                 disabled={isPending}
               />
+
+              {voteError && (
+                <p className="text-[12.5px] text-center" style={{ color: 'var(--nope, #ff4d6d)' }}>
+                  Vote failed — please try again.
+                </p>
+              )}
 
               <p
                 className="font-mono text-[10.5px] tracking-[.06em] text-muted text-center"

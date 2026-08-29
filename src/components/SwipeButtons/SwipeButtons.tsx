@@ -15,8 +15,7 @@ export default function SwipeButtons({
   dislikeScale,
   disabled,
 }: SwipeButtonsProps) {
-  const lineStyle =
-    'border border-ink/10 bg-white disabled:opacity-40 disabled:cursor-not-allowed'
+  const lineStyle = 'border border-ink/10 bg-white disabled:opacity-40 disabled:cursor-not-allowed'
 
   return (
     <div className="flex w-full items-center gap-3">
