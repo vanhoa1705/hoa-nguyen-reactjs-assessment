@@ -142,7 +142,7 @@ export default function MainPage() {
         </aside>
 
         {/* Stage */}
-        <section className="flex w-full max-w-[440px] flex-col items-center gap-[18px]">
+        <section className="relative z-10 flex w-full max-w-[440px] flex-col items-center gap-[18px]">
           {isLoading && (
             <div className="flex w-full flex-col gap-4" aria-label="Loading breeds">
               <Skeleton className="w-full" style={{ aspectRatio: '3 / 4.15' }} />
@@ -198,20 +198,13 @@ export default function MainPage() {
                 className="relative w-full"
                 style={{ aspectRatio: '3 / 4.15', marginTop: '2px' }}
               >
-                <button
-                  aria-label="Undo"
-                  onClick={undo}
-                  disabled={isPending}
-                  className="absolute left-3 top-3 z-10 h-[52px] w-[52px] rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-muted grid place-items-center backdrop-blur-md shadow-[0_12px_24px_-14px_rgba(20,22,26,.7)] hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  ↺
-                </button>
                 <BreedCard
                   breed={currentBreed}
                   imageUrl={image?.url}
                   onLike={() => vote(currentBreed, 1)}
                   onDislike={() => vote(currentBreed, -1)}
                   onSuperLike={() => vote(currentBreed, 2)}
+                  onUndo={undo}
                   onPress={() => navigate(`/breeds/${currentBreed.id}`)}
                   onDragOffset={(x) => dragX.set(x)}
                   isPending={isPending}

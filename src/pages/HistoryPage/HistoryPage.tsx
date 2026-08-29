@@ -45,13 +45,16 @@ function CollectionCard({
       className="overflow-hidden rounded-[18px] border border-ink/10 bg-white text-left transition-all hover:-translate-y-1"
       style={{ boxShadow: '0 2px 6px rgba(20,22,26,.05)' }}
     >
-      <div className="relative h-44 bg-center bg-cover" style={{
-        backgroundImage: image?.url
-          ? `url(${image.url})`
-          : `repeating-linear-gradient(28deg, rgba(20,22,26,.055) 0 10px, rgba(20,22,26,0) 10px 22px),
+      <div
+        className="relative h-44 bg-center bg-cover"
+        style={{
+          backgroundImage: image?.url
+            ? `url(${image.url})`
+            : `repeating-linear-gradient(28deg, rgba(20,22,26,.055) 0 10px, rgba(20,22,26,0) 10px 22px),
              radial-gradient(120% 90% at 30% 18%, rgba(255,255,255,.85), rgba(255,255,255,0) 60%),
              oklch(0.88 0.045 220)`,
-      }}>
+        }}
+      >
         <span
           className="absolute right-2.5 top-2.5 grid h-8 w-8 place-items-center rounded-xl border border-white/35 bg-white/90 text-[15px] backdrop-blur-md"
           style={{ color: badge.color, boxShadow: '0 4px 12px -6px rgba(20,22,26,.4)' }}
@@ -116,7 +119,11 @@ export default function HistoryPage() {
                 className="flex flex-1 items-center justify-center rounded-[14px] py-2.5 text-[13px] font-medium transition-colors"
                 style={
                   filter === id
-                    ? { background: '#fff', color: 'var(--ink)', boxShadow: '0 2px 6px rgba(20,22,26,.12)' }
+                    ? {
+                        background: '#fff',
+                        color: 'var(--ink)',
+                        boxShadow: '0 2px 6px rgba(20,22,26,.12)',
+                      }
                     : { color: 'var(--muted)' }
                 }
               >

@@ -10,14 +10,17 @@ export function useVoteActions(breeds: Breed[]) {
 
   const { mutate, isPending } = useMutation({
     mutationFn: postVote,
-    onSuccess: () => advance(breeds),
+    onSuccess: (_data, variables) => {
+      recordVote(variables.breedId, variables.value)
+      advance(breeds)
+    },
   })
 
   function vote(breed: Breed, value: VoteValue) {
-    recordVote(String(breed.id), value)
     if (breed.reference_image_id) {
-      mutate({ imageId: breed.reference_image_id, value })
+      mutate({ imageId: breed.reference_image_id, value, breedId: String(breed.id) })
     } else {
+      recordVote(String(breed.id), value)
       advance(breeds)
     }
   }

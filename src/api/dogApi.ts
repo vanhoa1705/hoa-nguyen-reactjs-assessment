@@ -36,6 +36,7 @@ export async function postVote(payload: VotePayload): Promise<VoteResponse> {
     }),
   })
 }
+// breedId is passed through VotePayload for onSuccess callbacks but not sent to the API
 
 export async function fetchVotes(): Promise<VoteRecord[]> {
   return apiFetch<VoteRecord[]>(`/votes?sub_id=${SUB_ID}`)

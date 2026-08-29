@@ -10,6 +10,7 @@ interface BreedCardProps {
   onLike: () => void
   onDislike: () => void
   onSuperLike?: () => void
+  onUndo?: () => void
   onPress: () => void
   onDragOffset?: (x: number) => void
   isPending?: boolean
@@ -21,6 +22,7 @@ export default function BreedCard({
   onLike,
   onDislike,
   onSuperLike,
+  onUndo,
   onPress,
   onDragOffset,
   isPending,
@@ -99,6 +101,22 @@ export default function BreedCard({
         }}
       />
 
+      {onUndo && (
+        <button
+          type="button"
+          aria-label="Undo"
+          disabled={isPending}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            onUndo()
+          }}
+          className="absolute left-3 top-3 z-[8] grid h-[52px] w-[52px] place-items-center rounded-[18px] border border-white/35 bg-white/90 text-[20px] text-muted shadow-[0_12px_24px_-14px_rgba(20,22,26,.7)] backdrop-blur-md transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          ↺
+        </button>
+      )}
+
       {onSuperLike && (
         <button
           type="button"
@@ -160,9 +178,6 @@ export default function BreedCard({
                 ))}
               </div>
             )}
-          </div>
-          <div className="flex-none w-[34px] h-[34px] rounded-xl bg-white/[.18] border border-white/[.28] grid place-items-center text-white text-[15px]">
-            ›
           </div>
         </div>
       </div>
